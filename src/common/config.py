@@ -27,6 +27,12 @@ class DataArguments:
             "help": "Shuffle the data"
         }
     )
+    batch_size: int = field(
+        default=1,
+        metadata={
+            "help": "Batch size"
+        }
+    )
 
 
 @dataclass
@@ -79,6 +85,27 @@ class ModelArguments:
             "help": "Padding strategy"
         }
     )
+    num_beams: Optional[int] = field(
+        default=4,
+        metadata={
+            "help": "Number of beams to use for evaluation. This argument will be passed to ``model.generate``, "
+            "which is used during ``evaluate`` and ``predict``."
+        },
+    )
+    length_penalty: Optional[float] = field(
+        default=1.0,
+        metadata={
+            "help": "Exponential penalty to the length. 1.0 means no penalty. Set to values < 1.0 in order to encourage "
+            "the model to generate shorter sequences, to a value > 1.0 in order to encourage the model to produce longer "
+            "sequences."
+        },
+    )
+    repetition_penalty: Optional[float] = field(
+        default=1.0,
+        metadata={
+            "help": "Primarily useful for CTRL model; in that case, use 1.2"
+        },
+    )
 
 @dataclass
 class TrainingArguments:
@@ -86,7 +113,7 @@ class TrainingArguments:
         default=42, metadata={"help": "Random seed for data split"}
     )
     batch_size: int = field(
-        default=8, metadata={"help": "Batch size for training"}
+        default=1, metadata={"help": "Batch size for training"}
     )
     do_train: bool = field(
         default=True, metadata={"help": "Whether to run training."}
@@ -142,7 +169,7 @@ class TrainingArguments:
         },
     )
     max_train_samples: Optional[int] = field(
-        default=2,
+        default=1,
         metadata={
             "help": "For debugging purposes or quicker training, truncate the number of training examples to this "
             "value if set."
@@ -187,7 +214,7 @@ class TrainingArguments:
         },
     )
     use_gold_inputs: bool = field(
-        default=True,
+        default=False,
         metadata={
             "help": "Whether to use gold inputs or not"
         },
