@@ -131,3 +131,6 @@ dmypy.json
 # pycharm
 .idea/
 **__pycache__/
+
+# logging
+wandb/
