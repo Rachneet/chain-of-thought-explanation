@@ -1,0 +1,110 @@
+{
+    "os": "Linux-3.10.0-1160.71.1.el7.x86_64-x86_64-with-glibc2.17",
+    "python": "3.10.0",
+    "heartbeatAt": "2022-12-29T12:54:28.297577",
+    "startedAt": "2022-12-29T12:54:27.697417",
+    "docker": null,
+    "cuda": null,
+    "args": [],
+    "state": "running",
+    "program": "/storage/ukp/work/sachdeva/research_projects/chain-of-thought/src/trainer.py",
+    "host": "wormulon",
+    "username": "sachdeva",
+    "executable": "/storage/ukp/work/sachdeva/miniconda3/envs/cot/bin/python3.10",
+    "cpu_count": 16,
+    "cpu_count_logical": 16,
+    "cpu_freq": {
+        "current": 3199.998,
+        "min": 0.0,
+        "max": 0.0
+    },
+    "cpu_freq_per_core": [
+        {
+            "current": 3199.998,
+            "min": 0.0,
+            "max": 0.0
+        },
+        {
+            "current": 3199.998,
+            "min": 0.0,
+            "max": 0.0
+        },
+        {
+            "current": 3199.998,
+            "min": 0.0,
+            "max": 0.0
+        },
+        {
+            "current": 3199.998,
+            "min": 0.0,
+            "max": 0.0
+        },
+        {
+            "current": 3199.998,
+            "min": 0.0,
+            "max": 0.0
+        },
+        {
+            "current": 3199.998,
+            "min": 0.0,
+            "max": 0.0
+        },
+        {
+            "current": 3199.998,
+            "min": 0.0,
+            "max": 0.0
+        },
+        {
+            "current": 3199.998,
+            "min": 0.0,
+            "max": 0.0
+        },
+        {
+            "current": 3199.998,
+            "min": 0.0,
+            "max": 0.0
+        },
+        {
+            "current": 3199.998,
+            "min": 0.0,
+            "max": 0.0
+        },
+        {
+            "current": 3199.998,
+            "min": 0.0,
+            "max": 0.0
+        },
+        {
+            "current": 3199.998,
+            "min": 0.0,
+            "max": 0.0
+        },
+        {
+            "current": 3199.998,
+            "min": 0.0,
+            "max": 0.0
+        },
+        {
+            "current": 3199.998,
+            "min": 0.0,
+            "max": 0.0
+        },
+        {
+            "current": 3199.998,
+            "min": 0.0,
+            "max": 0.0
+        },
+        {
+            "current": 3199.998,
+            "min": 0.0,
+            "max": 0.0
+        }
+    ],
+    "disk": {
+        "total": 487.40196228027344,
+        "used": 352.0726432800293
+    },
+    "memory": {
+        "total": 31.259868621826172
+    }
+}

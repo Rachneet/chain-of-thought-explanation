@@ -214,7 +214,7 @@ class TrainingArguments:
         },
     )
     use_gold_inputs: bool = field(
-        default=False,
+        default=True,
         metadata={
             "help": "Whether to use gold inputs or not"
         },

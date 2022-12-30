@@ -242,7 +242,6 @@ class ExplanationTreeGenerator:
                         model_outputs = self.predict(model_inputs)
                         model_outputs = [output for output in model_outputs]
                         print(f"Model outputs at step {proof_step}: ", model_outputs)
-                        # print("Model outputs: ", model_outputs)
 
             # decrement proof steps by subtracting from proof steps
             proof_steps = [p-1 for p in proof_steps]
@@ -250,7 +249,10 @@ class ExplanationTreeGenerator:
             term_indices = [i for i, p in enumerate(proof_steps) if p < 0]
         print("term_indices: ", term_indices)
         print("loss: ", loss)
-        avg_loss = loss.item() / max_steps
+        # check if loss is a tensor
+        if isinstance(loss, torch.Tensor):
+            loss = loss.item()
+        avg_loss = loss / max_steps
 
         print("avg_loss: ", avg_loss)
         print("Final inputs: ", inputs)
@@ -272,7 +274,8 @@ class ExplanationTreeGenerator:
             inputs,
             max_length=self.model_args.max_src_length,
             padding=self.model_args.padding,
-            truncation=True
+            truncation=True,
+            return_tensors="pt",
         )
 
         # Setup the tokenizer for targets
@@ -282,14 +285,13 @@ class ExplanationTreeGenerator:
                 max_length=self.model_args.max_target_length,
                 padding=self.model_args.padding,
                 truncation=True,
+                return_tensors="pt",
             )
             # If we are padding here, replace all tokenizer.pad_token_id in the labels by -100 when we want to ignore
             # padding in the loss
             if self.model_args.padding == "max_length":
-                labels["input_ids"] = [
-                    [(l if l != self.tokenizer.pad_token_id else -100) for l in label]
-                    for label in labels["input_ids"]
-                ]
+                labels["input_ids"] = labels["input_ids"].masked_fill(
+                    labels["input_ids"] == self.tokenizer.pad_token_id, -100)
 
             model_inputs["labels"] = labels["input_ids"]
         # ensure tensors are on the right device
