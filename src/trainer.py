@@ -1,5 +1,5 @@
 """
-Generation of explanation trees
+This file contains the trainer class for the generation of Chain of Thought explanations.
 """
 
 import logging
@@ -28,7 +28,16 @@ from src.common.config import DataArguments, ModelArguments, TrainingArguments
 logger = logging.getLogger(__name__)
 
 
-class ExplanationTreeTrainer:
+class ExplanationTrainer(Trainer):
+    """
+    Trainer class for explanation generation
+    Overrides the training and evaluation methods
+    in huggingface's Trainer class
+    """
+    pass
+
+
+class ExplanationTreeGenerator:
     def __init__(
         self,
         data_args,
@@ -52,17 +61,13 @@ class ExplanationTreeTrainer:
         self.model = AutoModelForSeq2SeqLM.from_pretrained(
             self.model_args.model_name_or_path, config=config, cache_dir=self.model_args.cache_dir
         )
+        self.model.to(self.device)
         dataloader = PreprocessDataset(
             data_path=self.data_args.data_path,
             seed=self.data_args.seed,
             shuffle=self.data_args.shuffle,
         )
         self.train_set, self.val_set = dataloader.preprocess_data()
-
-    def _ensure_tensor_on_device(self, tensor: torch.Tensor, device: torch.device) -> torch.Tensor:
-        if tensor.device != device:
-            return tensor.to(device)
-        return tensor
 
     def _preprocess_factoid_generation(
         self,
@@ -130,18 +135,8 @@ class ExplanationTreeTrainer:
         self,
         examples,
     ) -> Tuple[List[str], List[str]]:
-        # question = examples["question"]
-        # context = examples["context"]
-        # answer = examples["answer"]
-        # hypotheses = examples["hypothesis"]
-        # meta_info = examples["meta"]
-        # explanation_chain = examples["explanation_chain"]
-
-        # combined_inputs = []
-        # combined_targets = []
 
         proof_steps = examples["depth_of_proof"]
-        print(proof_steps)
         max_steps = max(proof_steps) + 1
 
         def generate_target_input(factoid, feature):
@@ -152,34 +147,34 @@ class ExplanationTreeTrainer:
         model_outputs = []
         term_indices = []
         loss = 0
-        complete_generated_factoids = []
+        remaining_factoids = []
         for proof_step in range(max_steps):
             hypotheses = examples["hypothesis"]
             meta_info = examples["meta"]
             explanation_chain = examples["explanation_chain"]
             predicted_factoids = []
+            # at step 0, we generate the all factoids if generate_factoids is True
+            # and filter the factoids that are required for the proof based on the explanation chain
             if proof_step == 0:
                 print("----------")
                 print("In proof step 0")
-                print(examples["explanation_chain"])
                 # gold inputs from factoid generation step
                 prev_inputs, prev_targets = self._preprocess_factoid_generation(examples)
                 if self.train_args.generate_factoids:
-                    print("Generating factoids")
+                    logger.info("Generating factoids")
                     # generate factoids
                     model_inputs = self._encode_inputs(prev_inputs, prev_targets)
-                    model_inputs = {k: torch.tensor(v) for k, v in model_inputs.items()}
                     loss += self.model(**model_inputs)[0]
                     predicted_factoids = self.predict(model_inputs)
                     prev_targets = predicted_factoids
                     predicted_factoids = list(deepflatten([factoid.split(";") for factoid in predicted_factoids], depth=1))
-                    # complete_generated_factoids.append(predicted_factoids)
                     print("predicted_factoids: ", predicted_factoids)
-                    print("complete_generated_factoids: ", complete_generated_factoids)
                 # set prev_inputs to base_inputs to be used in other steps
                 base_inputs = prev_inputs
                 print("Prev. inputs at step 0: ", prev_inputs)
                 # concatenate the previous inputs and targets
+                # remove the trailing ; from the targets
+                prev_targets = [target.rstrip(";") for target in prev_targets]
                 inputs = [base_input + " " + f"factoids: {prev_target}"
                           for base_input, prev_target in zip(base_inputs, prev_targets)]
                 print("Inputs at step 0: ", inputs)
@@ -196,16 +191,15 @@ class ExplanationTreeTrainer:
                 print("targets at step 0: ", targets)
 
                 if not self.train_args.use_gold_inputs:
-                    # generate factoids using the model
+                    # select factoids using the model
                     model_inputs = self._encode_inputs(inputs=inputs, targets=targets)
-                    model_inputs = {k: torch.tensor(v) for k, v in model_inputs.items()}
                     loss += self.model(**model_inputs)[0]
                     model_outputs = self.predict(model_inputs)
                     print("Model outputs at step 0: ", model_outputs)
                     # remove the filtered factoids (model_outputs) from the predicted factoids list
                     remaining_factoids = [factoid for factoid in predicted_factoids
                                           if factoid not in model_outputs[0].split(";")]
-                    # complete_generated_factoids.append(model_outputs)
+                    print("Remaining factoids: ", remaining_factoids)
 
             else:
                 print("----------")
@@ -218,11 +212,7 @@ class ExplanationTreeTrainer:
 
                 for base_input, meta_info, hypothesis, exp_chain in zip(
                         base_inputs, meta_info, hypotheses, explanation_chain):
-                    print("base_input: ", base_input)
-                    print("meta_info: ", meta_info)
-                    print("hypotheses: ", hypothesis)
                     exp_step = exp_chain[current_step]
-                    print("exp_step: ", exp_step)
                     inp_idx, out_idx = 0, 1
 
                     # outputs can have intermediate conclusions or the final conclusion (hypothesis)
@@ -237,22 +227,17 @@ class ExplanationTreeTrainer:
                         inputs = [base_input + " " + f"facts: {';'.join(inp_text)}"]
                         print("inp_text: ", inp_text)
                     else:
-                        # # check if we are in the last step of hypothesis generation
-                        # if proof_step == max_steps - 1:
-                        #     # apart from the intermediate conclusions, we also need the remaining factoids
-                        #     # to generate the final conclusion
-                        #     remaining_factoids = [
-                        #         explanation[proof_step][sent_idx]
-                        #         for explanation in explanation_chain
-                        #     ]
-                        #     remaining_factoids = [generate_target_input(remaining_factoids[i], meta_info[i]["triples"])
-                        #                             for i in range(len(remaining_factoids))]
-                        #     inputs = [base_input + " " + f"facts: {remaining_factoids[i]}"
-                        #               for i in range(len(remaining_factoids))]
-                        # model outputs from previous step
-                        inputs = [base_input + " " + f"facts: {output}" for output in model_outputs]
+                        # check if we are in the last step of hypothesis generation
+                        # and if we need to use the generated factoids
+                        if self.train_args.generate_factoids and proof_step == max_steps - 1:
+                            # apart from the intermediate conclusions, we also need the remaining factoids
+                            # to generate the final conclusion
+                            inputs = [base_input + " " + f"facts: {output};{';'.join(remaining_factoids)}"
+                                      for output in model_outputs]
+                        else:
+                            # model outputs from previous step
+                            inputs = [base_input + " " + f"facts: {output}" for output in model_outputs]
                         model_inputs = self._encode_inputs(inputs=inputs, targets=targets)
-                        model_inputs = {k: torch.tensor(v) for k, v in model_inputs.items()}
                         loss += self.model(**model_inputs)[0]
                         model_outputs = self.predict(model_inputs)
                         model_outputs = [output for output in model_outputs]
@@ -265,7 +250,7 @@ class ExplanationTreeTrainer:
             term_indices = [i for i, p in enumerate(proof_steps) if p < 0]
         print("term_indices: ", term_indices)
         print("loss: ", loss)
-        avg_loss = loss / max_steps
+        avg_loss = loss.item() / max_steps
 
         print("avg_loss: ", avg_loss)
         print("Final inputs: ", inputs)
@@ -289,7 +274,7 @@ class ExplanationTreeTrainer:
             padding=self.model_args.padding,
             truncation=True
         )
-        # print("Model inputs: ", model_inputs)
+
         # Setup the tokenizer for targets
         if targets is not None:
             labels = self.tokenizer(
@@ -299,7 +284,7 @@ class ExplanationTreeTrainer:
                 truncation=True,
             )
             # If we are padding here, replace all tokenizer.pad_token_id in the labels by -100 when we want to ignore
-            # padding in the loss.
+            # padding in the loss
             if self.model_args.padding == "max_length":
                 labels["input_ids"] = [
                     [(l if l != self.tokenizer.pad_token_id else -100) for l in label]
@@ -307,16 +292,15 @@ class ExplanationTreeTrainer:
                 ]
 
             model_inputs["labels"] = labels["input_ids"]
+        # ensure tensors are on the right device
+        model_inputs = {k: v.to(self.device) for k, v in model_inputs.items()}
         # print(model_inputs)
         return model_inputs
 
     def _preprocess_pipeline(self, examples):
         print("Preprocessing pipeline")
         # task 1: Generate factoids
-        # if self.train_args.generate_factoids:
         inputs, targets = self._preprocess_factoid_generation(examples)
-            # model_inputs = self._encode_inputs(inputs, targets)
-
         # task 2 : Generate intermediate conclusion
         inputs, targets = self._preprocess_intermediate_conclusion_generation(examples)
         model_inputs = self._encode_inputs(inputs, targets)
@@ -356,7 +340,8 @@ class ExplanationTreeTrainer:
             length_penalty=self.model_args.length_penalty,
             early_stopping=True,
         )
-        preds = [self.tokenizer.decode(g, skip_special_tokens=True, clean_up_tokenization_spaces=False) for g in generated_ids]
+        preds = [self.tokenizer.decode(g, skip_special_tokens=True, clean_up_tokenization_spaces=False)
+                 for g in generated_ids]
         return preds
 
     def train(self):
@@ -495,5 +480,5 @@ if __name__ == "__main__":
             project=TrainingArguments.project_name,
     )
     wandb.run.name = training_args.output_dir.split("/")[-1]
-    trainer = ExplanationTreeTrainer(data_args, model_args, training_args)
+    trainer = ExplanationTreeGenerator(data_args, model_args, training_args)
     trainer.train()

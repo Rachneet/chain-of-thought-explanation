@@ -208,7 +208,7 @@ class TrainingArguments:
         },
     )
     generate_factoids: bool = field(
-        default=True,
+        default=False,
         metadata={
             "help": "Whether to generate factoids or not"
         },
