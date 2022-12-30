@@ -1,0 +1,5 @@
+datasets==2.8.0
+torch==1.13.1
+transformers==4.25.1
+wandb==0.13.7
+iteration_utilities==0.11.0
