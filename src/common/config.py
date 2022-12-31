@@ -176,7 +176,7 @@ class TrainingArguments:
         },
     )
     max_val_samples: Optional[int] = field(
-        default=None,
+        default=1,
         metadata={
             "help": "For debugging purposes or quicker training, truncate the number of validation examples to this "
             "value if set."

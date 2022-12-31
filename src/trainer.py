@@ -6,11 +6,13 @@ import logging
 import itertools
 import json
 import numpy as np
+from typing import Any, Dict, List, Optional, Tuple, Union
 from iteration_utilities import deepflatten, flatten
 from typing import List, Tuple, Callable, Iterable
 
 from datasets import load_metric
 import torch
+import torch.nn as nn
 import torch.nn.functional as F
 from transformers import (
     AutoTokenizer,
@@ -34,7 +36,17 @@ class ExplanationTrainer(Trainer):
     Overrides the training and evaluation methods
     in huggingface's Trainer class
     """
-    pass
+    def compute_loss(self, model, inputs, return_outputs=False):
+        """
+        Compute loss
+        """
+        labels = inputs.pop("labels")
+        outputs = model(**inputs, labels=labels)
+        loss = outputs[0]
+        print("Loss in compute loss: ", loss)
+        if return_outputs:
+            return loss, outputs
+        return loss
 
 
 class ExplanationTreeGenerator:
@@ -84,7 +96,7 @@ class ExplanationTreeGenerator:
             return input
 
         def generate_target_input(factoids):
-            # replace none with empty string and joing with ;
+            # replace none with empty string and joining with ;
             factoids = [factoid if factoid else "" for factoid in factoids]
             return ";".join(factoids)
 
@@ -302,11 +314,10 @@ class ExplanationTreeGenerator:
     def _preprocess_pipeline(self, examples):
         print("Preprocessing pipeline")
         # task 1: Generate factoids
-        inputs, targets = self._preprocess_factoid_generation(examples)
         # task 2 : Generate intermediate conclusion
+        # task 3 : Generate final conclusion
         inputs, targets = self._preprocess_intermediate_conclusion_generation(examples)
         model_inputs = self._encode_inputs(inputs, targets)
-        # task 3 : Generate final conclusion
         return model_inputs
 
     def data_collator(self, features):
@@ -362,63 +373,62 @@ class ExplanationTreeGenerator:
             )
             print("Train dataset: ", train_dataset)
             print("Train dataset length: ", len(train_dataset))
-            # if self.do_eval or self.do_predict:
-            #     if self.max_val_samples is not None:
-            #         # We will select sample from whole data if argument is specified
-            #         max_val_samples = min(len(self.val_set), self.max_val_samples)
-            #         self.val_set = self.val_set.select(range(max_val_samples))
-            #     eval_dataset = self.val_set.map(
-            #         self._prepare_features,
-            #         batched=True,
-            #         desc="Running tokenizer on validation dataset",
-            #     )
-            #
-            # args = Seq2SeqTrainingArguments(
-            #     output_dir=OUTPUT_DIR,
-            #     overwrite_output_dir=False,
-            #     do_train=self.do_train,
-            #     do_eval=self.do_eval,
-            #     per_device_train_batch_size=config.batch_size,
-            #     per_device_eval_batch_size=BATCH_SIZE,
-            #     learning_rate=config.learning_rate,
-            #     num_train_epochs=config.epochs,
-            #     weight_decay=config.weight_decay,
-            #     lr_scheduler_type=SCHEDULER,
-            #     save_strategy='epoch',
-            #     evaluation_strategy='epoch',
-            #     logging_strategy='epoch',
-            #     predict_with_generate=True,
-            #     load_best_model_at_end=True,
-            #     save_total_limit=2,
-            #     # run_name=WANDB_RUN_NAME,
-            #     disable_tqdm=False,
-            #     report_to=["wandb"],
-            #     remove_unused_columns=False,
-            #     fp16=FP16,
-            #     seed=SEED,
-            #     label_names=["labels"],  # it's important to log eval_loss
-            # )
-            # # print("Batch Size", args.train_batch_size)
-            # # print("Parallel Mode", args.parallel_mode)
-            #
-            # trainer = Seq2SeqTrainer(
-            #     model=self.model,
-            #     args=args,
-            #     data_collator=self.data_collator,
-            #     train_dataset=train_dataset if self.do_train else None,
-            #     eval_dataset=eval_dataset if self.do_eval else None,
-            #     compute_metrics=self.compute_metrics,
-            # )
-            # try:
-            #     if self.do_train:
-            #         checkpoint = None
-            #         if RESUME_TRAINING is not None:
-            #             checkpoint = RESUME_TRAINING
-            #         trainer.train(resume_from_checkpoint=checkpoint)
-            #         trainer.save_model()
-            # except KeyboardInterrupt:
-            #     trainer.save_model("interrupted-fig-lang")
-            #
+            if self.train_args.do_eval or self.train_args.do_predict:
+                if self.train_args.max_val_samples is not None:
+                    # We will select sample from whole data if argument is specified
+                    max_val_samples = min(len(self.val_set), self.train_args.max_val_samples)
+                    self.val_set = self.val_set.select(range(max_val_samples))
+                eval_dataset = self.val_set.map(
+                    self._preprocess_pipeline,
+                    batched=True,
+                    batch_size=self.data_args.batch_size,
+                    desc="Running tokenizer on validation dataset",
+                )
+
+            args = Seq2SeqTrainingArguments(
+                output_dir=self.train_args.output_dir,
+                overwrite_output_dir=False,
+                do_train=self.train_args.do_train,
+                do_eval=self.train_args.do_eval,
+                per_device_train_batch_size=self.train_args.batch_size,
+                per_device_eval_batch_size=self.train_args.batch_size,
+                learning_rate=self.train_args.learning_rate,
+                num_train_epochs=self.train_args.epochs,
+                weight_decay=self.train_args.weight_decay,
+                lr_scheduler_type=self.train_args.lr_scheduler_type,
+                save_strategy='epoch',
+                evaluation_strategy='epoch',
+                logging_strategy='epoch',
+                predict_with_generate=True,
+                load_best_model_at_end=True,
+                save_total_limit=2,
+                disable_tqdm=False,
+                report_to=["wandb"],
+                remove_unused_columns=False,
+                seed=self.train_args.seed,
+                label_names=["labels"],  # it's important to log eval_loss
+            )
+            # print("Batch Size", args.train_batch_size)
+            # print("Parallel Mode", args.parallel_mode)
+
+            trainer = ExplanationTrainer(
+                model=self.model,
+                args=args,
+                data_collator=self.data_collator,
+                train_dataset=train_dataset if self.train_args.do_train else None,
+                eval_dataset=eval_dataset if self.train_args.do_eval else None,
+                # compute_metrics=self.compute_metrics,
+            )
+            try:
+                if self.train_args.do_train:
+                    checkpoint = None
+                    if self.train_args.resume_from_checkpoint is not None:
+                        checkpoint = self.train_args.resume_from_checkpoint
+                    trainer.train(resume_from_checkpoint=checkpoint)
+                    trainer.save_model()
+            except KeyboardInterrupt:
+                trainer.save_model("interrupted-exp-tree")
+
             # if self.do_predict:
             #     logger.info("*** Predict ***")
             #     if CHECKPOINT is not None:
