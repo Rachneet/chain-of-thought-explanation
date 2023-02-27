@@ -134,3 +134,7 @@ dmypy.json
 
 # logging
 wandb/
+
+# models
+t5*
+interrupted*

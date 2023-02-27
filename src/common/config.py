@@ -3,6 +3,7 @@ from typing import List, Optional
 import copy
 
 BASE_PATH="/storage/ukp/work/sachdeva/research_projects/chain-of-thought"
+# BASE_PATH="/home/rachneet/projects/ukp/chain-of-thought"
 
 @dataclass
 class DataArguments:
@@ -133,11 +134,12 @@ class TrainingArguments:
     lr_scheduler_type: str = field(
         default="linear",
         metadata={
-            "help": "Learning rate scheduler to use. One of ['linear', 'cosine', 'cosine_with_restarts', 'polynomial', 'constant', 'constant_with_warmup']"
+            "help": "Learning rate scheduler to use. One of ['linear', 'cosine', 'cosine_with_restarts', "
+                    "'polynomial', 'constant', 'constant_with_warmup']"
         },
     )
     output_dir: str = field(
-        default=BASE_PATH+"/t5-small-cot",
+        default=BASE_PATH+"/t5-test-cot",
         metadata={"help": "The output directory where the model predictions and checkpoints will be written."},
     )
     overwrite_output_dir: bool = field(
@@ -151,7 +153,7 @@ class TrainingArguments:
         },
     )
     epochs: int = field(
-        default=1,
+        default=3,
         metadata={
             "help": "Number of epochs to train the model"
         },
@@ -163,20 +165,26 @@ class TrainingArguments:
         },
     )
     warmup_steps: int = field(
-        default=0,
+        default=100,
         metadata={
             "help": "Number of warmup steps for learning rate scheduler."
         },
     )
+    warmup_ratio: float = field(
+        default=0.0,
+        metadata={
+            "help": "Ratio of warmup steps used in the scheduler."
+        },
+    )
     max_train_samples: Optional[int] = field(
-        default=1,
+        default=None,
         metadata={
             "help": "For debugging purposes or quicker training, truncate the number of training examples to this "
             "value if set."
         },
     )
     max_val_samples: Optional[int] = field(
-        default=1,
+        default=None,
         metadata={
             "help": "For debugging purposes or quicker training, truncate the number of validation examples to this "
             "value if set."

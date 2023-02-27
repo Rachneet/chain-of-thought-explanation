@@ -27,8 +27,8 @@ class PreprocessDataset:
         dev_data = load_dataset("json", data_files=dev_data_file)["dev"]
         test_data = load_dataset("json", data_files=test_data_file)["test"]
 
-        print("Train data: ", train_data)
-        print("Val data: ", dev_data)
+        # print("Train data: ", train_data)
+        # print("Val data: ", dev_data)
         # if seed is not None shuffle data else shuffle data
         if self.shuffle:
             train_data = train_data.shuffle(seed=self.seed)
@@ -62,7 +62,7 @@ class PreprocessDataset:
         train_data, dev_data, test_data = self._load_data()
         train_data = train_data.map(self._process_proof_steps)
         dev_data = dev_data.map(self._process_proof_steps)
-        print("Train data: ", train_data[0])
+        # print("Train data: ", train_data[0])
         return train_data, dev_data
 
 
@@ -73,4 +73,11 @@ if __name__ == '__main__':
     shuffle = True
     drop_last = True
     data_loader = PreprocessDataset(data_path, seed=42, shuffle=True)
-    data_loader.preprocess_data()
+    train_data, dev_data = data_loader.preprocess_data()
+
+    proof_length = []
+    for sample in train_data:
+        length_of_proof = sample["length_of_proof"]
+        proof_length.append(length_of_proof)
+    from collections import Counter
+    print(Counter(proof_length))
